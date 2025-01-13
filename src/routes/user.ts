@@ -1,27 +1,17 @@
-import { Router, Request, Response } from "express";
-import prisma from "../helpers/prismaClient";
+const express = require("express");
+
 const { graphqlHTTP } = require("express-graphql");
 
-const router = Router();
+const router = express.Router();
+import schema from "../controllers/auth/schema";
+import resolver from "../controllers/auth/resolver";
 
 router.use(
-  "/auth",
+  "/signup",
   graphqlHTTP({
-    schema: require("../controllers/auth/schema"),
-    rootValue: require("../controllers/auth/resolver"),
+    schema: schema,
+    rootValue: resolver,
     graphiql: true,
     //customFormatErrorFn: errorHandling,
   })
 );
-
-router.post("/signup", async (req: Request, res: Response) => {
-  try {
-    const { name, email } = req.body;
-    const newUser = await prisma.users.create({
-      data: { name, email },
-    });
-    res.status(201).json(newUser);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
