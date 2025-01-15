@@ -14,7 +14,7 @@ type Query {
 }
 
 type Mutation {
-    signup(name: String, email: String, phone: String): User
+    signup(name: String!, email: String!, phone: String!): User!
 }
 
 schema {

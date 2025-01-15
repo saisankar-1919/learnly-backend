@@ -15,3 +15,5 @@ router.use(
     //customFormatErrorFn: errorHandling,
   })
 );
+
+module.exports = router;

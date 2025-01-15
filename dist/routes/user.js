@@ -14,4 +14,5 @@ router.use("/signup", graphqlHTTP({
     graphiql: true,
     //customFormatErrorFn: errorHandling,
 }));
+module.exports = router;
 //# sourceMappingURL=user.js.map
