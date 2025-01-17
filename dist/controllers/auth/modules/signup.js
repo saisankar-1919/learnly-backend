@@ -12,40 +12,55 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const passwordProtection_1 = require("../../../helpers/passwordProtection");
 const prismaClient_1 = __importDefault(require("../../../helpers/prismaClient"));
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const signup = (args, req) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log("args: ", args);
     try {
-        const { name, email, phone } = args;
-        //check for existing user
+        const { name, email, phone, password } = args;
+        // Check for existing user
         const existingUser = yield prismaClient_1.default.users.findFirst({
-            where: { email: email },
+            where: { email },
         });
         if (existingUser) {
-            throw new Error(JSON.stringify({ custom_error: "User already exist on this email" }));
+            throw new Error(JSON.stringify({ custom_error: "User already exists with this email" }));
         }
-        else {
-            const newUser = yield prismaClient_1.default.users.create({
-                data: {
-                    name: name,
-                    phone: phone,
-                    email: email,
-                },
-            });
-            return newUser;
-        }
+        // Create a new user
+        const newUser = yield prismaClient_1.default.users.create({
+            data: {
+                name,
+                phone,
+                email,
+                password: yield (0, passwordProtection_1.encryptPassword)(password),
+            },
+        });
+        const userId = newUser.id;
+        const authToken = jwt.sign({ user_id: userId, email: newUser.email }, process.env.JWT_SECRET);
+        yield prismaClient_1.default.users.update({
+            where: { id: userId },
+            data: { auth_token: authToken },
+        });
+        return newUser;
     }
     catch (error) {
-        console.log("error:", error);
+        console.error("Error during signup:", error);
+        let errorMessage = "Something went wrong"; // Default error message
         // Check if the error has a `custom_error` property
-        const parsedError = JSON.parse(error.message || "{}");
-        if (parsedError.custom_error) {
-            // Re-throw the same error to the caller
-            throw error;
+        try {
+            const parsedError = JSON.parse(error.message || "{}");
+            if (parsedError.custom_error) {
+                errorMessage = parsedError.custom_error;
+            }
         }
-        // For all other errors, use the default fallback message
-        const errorMessage = (req === null || req === void 0 ? void 0 : req.t)
-            ? req.t("something_went_wrong")
-            : "User does not exist or an error occurred.";
+        catch (parseError) {
+            console.error("Error parsing error message:", parseError);
+        }
+        // Use a localized error message if available
+        if (req === null || req === void 0 ? void 0 : req.t) {
+            errorMessage = req.t("something_went_wrong");
+        }
         throw new Error(JSON.stringify({ custom_error: errorMessage }));
     }
 });

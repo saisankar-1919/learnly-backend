@@ -1,42 +1,62 @@
+import { encryptPassword } from "../../../helpers/passwordProtection";
 import prisma from "../../../helpers/prismaClient";
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 const signup = async (args, req) => {
-  try {
-    const { name, email, phone } = args;
+  console.log("args: ", args);
 
-    //check for existing user
+  try {
+    const { name, email, phone, password } = args;
+
     const existingUser = await prisma.users.findFirst({
-      where: { email: email },
+      where: { email },
     });
+
     if (existingUser) {
       throw new Error(
-        JSON.stringify({ custom_error: "User already exist on this email" })
+        JSON.stringify({ custom_error: "User already exists with this email" })
       );
-    } else {
-      const newUser = await prisma.users.create({
-        data: {
-          name: name,
-          phone: phone,
-          email: email,
-        },
-      });
-
-      return newUser;
     }
+
+    const newUser = await prisma.users.create({
+      data: {
+        name,
+        phone,
+        email,
+        password: await encryptPassword(password),
+      },
+    });
+    const userId = newUser.id;
+
+    const authToken = jwt.sign(
+      { user_id: userId, email: newUser.email },
+      process.env.JWT_SECRET
+    );
+
+    await prisma.users.update({
+      where: { id: userId },
+      data: { auth_token: authToken },
+    });
+
+    return newUser;
   } catch (error) {
-    console.log("error:", error);
+    console.error("Error during signup:", error);
 
-    // Check if the error has a `custom_error` property
-    const parsedError = JSON.parse(error.message || "{}");
-    if (parsedError.custom_error) {
-      // Re-throw the same error to the caller
-      throw error;
+    let errorMessage = "Something went wrong";
+
+    try {
+      const parsedError = JSON.parse(error.message || "{}");
+      if (parsedError.custom_error) {
+        errorMessage = parsedError.custom_error;
+      }
+    } catch (parseError) {
+      console.error("Error parsing error message:", parseError);
     }
 
-    // For all other errors, use the default fallback message
-    const errorMessage = req?.t
-      ? req.t("something_went_wrong")
-      : "User does not exist or an error occurred.";
+    if (req?.t) {
+      errorMessage = req.t("something_went_wrong");
+    }
 
     throw new Error(JSON.stringify({ custom_error: errorMessage }));
   }

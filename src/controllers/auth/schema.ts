@@ -6,6 +6,7 @@ type User {
     name: String
     email: String
     phone: String
+    password: String
     auth_token: String
 }
 
@@ -14,7 +15,7 @@ type Query {
 }
 
 type Mutation {
-    signup(name: String!, email: String!, phone: String!): User!
+    signup(name: String!, email: String!, phone: String!, password: String!): User!
 }
 
 schema {
