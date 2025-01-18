@@ -8,6 +8,7 @@ type User {
     phone: String
     password: String
     auth_token: String
+    user_role: Number
 }
 
 type EmailLogin{

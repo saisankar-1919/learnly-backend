@@ -21,4 +21,5 @@ model users {
   auth_token String?
   created_at DateTime? @default(now()) @db.Timestamp(6)
   updated_at DateTime? @default(now()) @db.Timestamp(6)
+  user_role  Int?      @db.SmallInt
 }
