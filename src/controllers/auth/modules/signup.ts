@@ -1,21 +1,28 @@
 import { encryptPassword } from "../../../helpers/passwordProtection";
 import prisma from "../../../helpers/prismaClient";
-const bcrypt = require("bcrypt");
+import { CustomError } from "../../../helpers/customError"; // Importing CustomError
 const jwt = require("jsonwebtoken");
 
 const signup = async (args, req) => {
-  console.log("args: ", args);
-
   try {
     const { name, email, phone, password } = args;
 
+    const isValidEmail = (email) => {
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      return emailRegex.test(email);
+    };
+
+    if (!isValidEmail(email)) {
+      throw new CustomError("Invalid email format", "INVALID_EMAIL_FORMAT");
+    }
     const existingUser = await prisma.users.findFirst({
       where: { email },
     });
 
     if (existingUser) {
-      throw new Error(
-        JSON.stringify({ custom_error: "User already exists with this email" })
+      throw new CustomError(
+        "User already exists with this email",
+        "USER_EXISTS"
       );
     }
 
@@ -41,24 +48,16 @@ const signup = async (args, req) => {
 
     return newUser;
   } catch (error) {
-    console.error("Error during signup:", error);
+    console.error(error);
 
-    let errorMessage = "Something went wrong";
+    const errorMessage =
+      process.env.NODE_ENV === "production"
+        ? "Something went wrong"
+        : error.message;
 
-    try {
-      const parsedError = JSON.parse(error.message || "{}");
-      if (parsedError.custom_error) {
-        errorMessage = parsedError.custom_error;
-      }
-    } catch (parseError) {
-      console.error("Error parsing error message:", parseError);
-    }
-
-    if (req?.t) {
-      errorMessage = req.t("something_went_wrong");
-    }
-
-    throw new Error(JSON.stringify({ custom_error: errorMessage }));
+    throw new CustomError(errorMessage, error.code || "INTERNAL_SERVER_ERROR");
+  } finally {
+    prisma.$disconnect();
   }
 };
 

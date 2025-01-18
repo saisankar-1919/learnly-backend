@@ -1,39 +1,62 @@
-import { encryptPassword } from "../../../helpers/passwordProtection";
+import { CustomError } from "../../../helpers/customError";
+import { jwtVerifyAsync } from "../../../helpers/jwtVerify";
+import {
+  encryptPassword,
+  isPasswordValid,
+} from "../../../helpers/passwordProtection";
 import prisma from "../../../helpers/prismaClient";
-const bcrypt = require("bcrypt");
-const signup = async (args, req) => {
-  console.log("args: ", args);
-  try {
-    const { name, email, phone, password } = args;
+import bcrypt from "bcrypt";
 
-    //check for existing user
-    const existingUser = await prisma.users.findFirst({
-      where: { email: email },
-    });
-    if (existingUser) {
-      throw new Error(
-        JSON.stringify({ custom_error: "User already exist on this email" })
+const signin = async (args, req) => {
+  try {
+    if (!args.email || !args.password) {
+      throw new CustomError(
+        "Email and password must be provided",
+        "BAD_REQUEST"
       );
+    }
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(args.email)) {
+      throw new CustomError("Invalid email format", "BAD_REQUEST");
+    }
+
+    const user = await prisma.users.findUnique({
+      where: { email: args.email },
+    });
+
+    if (!user) {
+      throw new CustomError(
+        "User does not exist with this email address",
+        "NOT_FOUND"
+      );
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(
+      args.password,
+      user.password
+    );
+
+    if (isPasswordCorrect) {
+      return {
+        is_user_exist: true,
+        auth_token: user.auth_token,
+      };
     } else {
-      //return newUser;
+      throw new CustomError("Password is incorrect", "UNAUTHORIZED");
     }
   } catch (error) {
-    console.log("error:", error);
+    console.error(error);
 
-    // Check if the error has a `custom_error` property
-    const parsedError = JSON.parse(error.message || "{}");
-    if (parsedError.custom_error) {
-      // Re-throw the same error to the caller
-      throw error;
-    }
+    const errorMessage =
+      process.env.NODE_ENV === "production"
+        ? "Something went wrong"
+        : error.message;
 
-    // For all other errors, use the default fallback message
-    const errorMessage = req?.t
-      ? req.t("something_went_wrong")
-      : "Something went wrong";
-
-    throw new Error(JSON.stringify({ custom_error: errorMessage }));
+    throw new CustomError(errorMessage, error.code || "INTERNAL_SERVER_ERROR");
+  } finally {
+    prisma.$disconnect();
   }
 };
 
-export default signup;
+export default signin;

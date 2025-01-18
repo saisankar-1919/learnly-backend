@@ -14,20 +14,24 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const passwordProtection_1 = require("../../../helpers/passwordProtection");
 const prismaClient_1 = __importDefault(require("../../../helpers/prismaClient"));
-const bcrypt = require("bcrypt");
+const customError_1 = require("../../../helpers/customError"); // Importing CustomError
 const jwt = require("jsonwebtoken");
 const signup = (args, req) => __awaiter(void 0, void 0, void 0, function* () {
-    console.log("args: ", args);
     try {
         const { name, email, phone, password } = args;
-        // Check for existing user
+        const isValidEmail = (email) => {
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            return emailRegex.test(email);
+        };
+        if (!isValidEmail(email)) {
+            throw new customError_1.CustomError("Invalid email format", "INVALID_EMAIL_FORMAT");
+        }
         const existingUser = yield prismaClient_1.default.users.findFirst({
             where: { email },
         });
         if (existingUser) {
-            throw new Error(JSON.stringify({ custom_error: "User already exists with this email" }));
+            throw new customError_1.CustomError("User already exists with this email", "USER_EXISTS");
         }
-        // Create a new user
         const newUser = yield prismaClient_1.default.users.create({
             data: {
                 name,
@@ -45,23 +49,14 @@ const signup = (args, req) => __awaiter(void 0, void 0, void 0, function* () {
         return newUser;
     }
     catch (error) {
-        console.error("Error during signup:", error);
-        let errorMessage = "Something went wrong"; // Default error message
-        // Check if the error has a `custom_error` property
-        try {
-            const parsedError = JSON.parse(error.message || "{}");
-            if (parsedError.custom_error) {
-                errorMessage = parsedError.custom_error;
-            }
-        }
-        catch (parseError) {
-            console.error("Error parsing error message:", parseError);
-        }
-        // Use a localized error message if available
-        if (req === null || req === void 0 ? void 0 : req.t) {
-            errorMessage = req.t("something_went_wrong");
-        }
-        throw new Error(JSON.stringify({ custom_error: errorMessage }));
+        console.error(error);
+        const errorMessage = process.env.NODE_ENV === "production"
+            ? "Something went wrong"
+            : error.message;
+        throw new customError_1.CustomError(errorMessage, error.code || "INTERNAL_SERVER_ERROR");
+    }
+    finally {
+        prismaClient_1.default.$disconnect();
     }
 });
 exports.default = signup;

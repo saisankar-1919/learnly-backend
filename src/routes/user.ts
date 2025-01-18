@@ -16,4 +16,14 @@ router.use(
   })
 );
 
+router.use(
+  "/signin",
+  graphqlHTTP({
+    schema: schema,
+    rootValue: resolver,
+    graphiql: true,
+    //customFormatErrorFn: errorHandling,
+  })
+);
+
 module.exports = router;

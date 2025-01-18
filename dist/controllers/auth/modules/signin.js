@@ -12,37 +12,45 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const customError_1 = require("../../../helpers/customError");
 const prismaClient_1 = __importDefault(require("../../../helpers/prismaClient"));
-const bcrypt = require("bcrypt");
-const signup = (args, req) => __awaiter(void 0, void 0, void 0, function* () {
-    console.log("args: ", args);
+const bcrypt_1 = __importDefault(require("bcrypt"));
+const signin = (args, req) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { name, email, phone, password } = args;
-        //check for existing user
-        const existingUser = yield prismaClient_1.default.users.findFirst({
-            where: { email: email },
+        if (!args.email || !args.password) {
+            throw new customError_1.CustomError("Email and password must be provided", "BAD_REQUEST");
+        }
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(args.email)) {
+            throw new customError_1.CustomError("Invalid email format", "BAD_REQUEST");
+        }
+        const user = yield prismaClient_1.default.users.findUnique({
+            where: { email: args.email },
         });
-        if (existingUser) {
-            throw new Error(JSON.stringify({ custom_error: "User already exist on this email" }));
+        if (!user) {
+            throw new customError_1.CustomError("User does not exist with this email address", "NOT_FOUND");
+        }
+        const isPasswordCorrect = yield bcrypt_1.default.compare(args.password, user.password);
+        if (isPasswordCorrect) {
+            return {
+                is_user_exist: true,
+                auth_token: user.auth_token,
+            };
         }
         else {
-            //return newUser;
+            throw new customError_1.CustomError("Password is incorrect", "UNAUTHORIZED");
         }
     }
     catch (error) {
-        console.log("error:", error);
-        // Check if the error has a `custom_error` property
-        const parsedError = JSON.parse(error.message || "{}");
-        if (parsedError.custom_error) {
-            // Re-throw the same error to the caller
-            throw error;
-        }
-        // For all other errors, use the default fallback message
-        const errorMessage = (req === null || req === void 0 ? void 0 : req.t)
-            ? req.t("something_went_wrong")
-            : "Something went wrong";
-        throw new Error(JSON.stringify({ custom_error: errorMessage }));
+        console.error(error);
+        const errorMessage = process.env.NODE_ENV === "production"
+            ? "Something went wrong"
+            : error.message;
+        throw new customError_1.CustomError(errorMessage, error.code || "INTERNAL_SERVER_ERROR");
+    }
+    finally {
+        prismaClient_1.default.$disconnect();
     }
 });
-exports.default = signup;
+exports.default = signin;
 //# sourceMappingURL=signin.js.map

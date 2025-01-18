@@ -11,8 +11,13 @@ type User {
     auth_token: String
 }
 
+type EmailLogin{
+    is_user_exist: Boolean
+    auth_token: String
+}
+
 type Query {
-    signin(auth_token: String!): User!
+    signin(email: String!, password:String!): EmailLogin!
 }
 
 type Mutation {

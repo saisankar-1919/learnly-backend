@@ -14,5 +14,11 @@ router.use("/signup", graphqlHTTP({
     graphiql: true,
     //customFormatErrorFn: errorHandling,
 }));
+router.use("/signin", graphqlHTTP({
+    schema: schema_1.default,
+    rootValue: resolver_1.default,
+    graphiql: true,
+    //customFormatErrorFn: errorHandling,
+}));
 module.exports = router;
 //# sourceMappingURL=user.js.map
